@@ -5,7 +5,7 @@ metadata:
 spec:
   acme:
     email: srupert@sbrtech.xyz
-    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    server: https://acme-staging-v02.api.letsencrypt.org/directory # Change once ready to go to prod.
     privateKeySecretRef:
       name: cloudflare-letsencrypt-account-key
     

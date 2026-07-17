@@ -17,7 +17,7 @@ spec:
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
-  name: infrastructure-configs
+  name: infrastructure-external-secrets-configs
   namespace: flux-system
 spec:
   dependsOn:
@@ -25,7 +25,43 @@ spec:
   interval: 10m
   retryInterval: 1m
   timeout: 5m
-  path: ./control-plane/infrastructure/configs
+  path: ./control-plane/infrastructure/configs/external-secrets
+  prune: true
+  wait: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: infrastructure-cert-manager-secrets
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: infrastructure-external-secrets-configs
+  interval: 10m
+  retryInterval: 1m
+  timeout: 5m
+  path: ./control-plane/infrastructure/configs/secrets/cert-manager
+  prune: true
+  wait: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: infrastructure-cert-manager-configs
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: infrastructure-cert-manager-secrets
+  interval: 10m
+  retryInterval: 1m
+  timeout: 5m
+  path: ./control-plane/infrastructure/configs/cert-manager
   prune: true
   wait: true
   sourceRef:
