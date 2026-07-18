@@ -1,0 +1,16 @@
+apiVersion: cilium.io/v2
+kind: CiliumBGPClusterConfig
+metadata:
+  name: control-plane
+spec:
+  nodeSelector:
+    matchLabels: {}
+  bgpInstances:
+    - name: control-plane
+      localASN: 4201100001
+      peers:
+        - name: vyos-vrrp
+          peerASN: 4201000001
+          peerAddress: 10.80.10.1
+          peerConfigRef:
+            name: vyos

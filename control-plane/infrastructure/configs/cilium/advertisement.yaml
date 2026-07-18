@@ -1,0 +1,19 @@
+apiVersion: cilium.io/v2
+kind: CiliumBGPAdvertisement
+metadata:
+  name: control-plane-services
+  labels:
+    advertise: bgp
+spec:
+  advertisements:
+    - advertisementType: Service
+      service:
+        addresses:
+          - LoadBalancerIP
+      selector:
+        matchExpressions:
+          # This allows all unlabeled services to be eligible for advertisement.
+          - key: unused
+            operator: NotIn
+            values:
+              - never-used
