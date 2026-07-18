@@ -67,3 +67,39 @@ spec:
   sourceRef:
     kind: GitRepository
     name: flux-system
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: infrastructure-cilium-secrets
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: infrastructure-external-secrets-configs
+  interval: 10m
+  retryInterval: 1m
+  timeout: 5m
+  path: ./control-plane/infrastructure/configs/secrets/cilium
+  prune: true
+  wait: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+---
+# apiVersion: kustomize.toolkit.fluxcd.io/v1
+# kind: Kustomization
+# metadata:
+#   name: infrastructure-cilium-configs
+#   namespace: flux-system
+# spec:
+#   dependsOn:
+#     - name: infrastructure-cilium-secrets
+#   interval: 10m
+#   retryInterval: 1m
+#   timeout: 5m
+#   path: ./control-plane/infrastructure/configs/cilium
+#   prune: true
+#   wait: true
+#   sourceRef:
+#     kind: GitRepository
+#     name: flux-system
