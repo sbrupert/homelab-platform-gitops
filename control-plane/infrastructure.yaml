@@ -103,3 +103,39 @@ spec:
   sourceRef:
     kind: GitRepository
     name: flux-system
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: infrastructure-external-dns-secrets
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: infrastructure-external-secrets-configs
+  interval: 10m
+  retryInterval: 1m
+  timeout: 5m
+  path: ./control-plane/infrastructure/configs/secrets/external-dns
+  prune: true
+  wait: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: infrastructure-external-dns
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: infrastructure-external-dns-secrets
+  interval: 10m
+  retryInterval: 1m
+  timeout: 10m
+  path: ./control-plane/infrastructure/controllers/external-dns
+  prune: true
+  wait: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
