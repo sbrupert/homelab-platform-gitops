@@ -5,3 +5,5 @@ resources:
   - cluster-config.yaml
   - ip-pool.yaml
   - peer-config.yaml
+  - platform-networking-ns.yaml
+  - internal-gateway.yaml

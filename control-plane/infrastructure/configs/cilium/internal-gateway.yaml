@@ -1,0 +1,27 @@
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: internal
+  namespace: platform-networking
+  annotations:
+    cert-manager.io/cluster-issuer: cloudflare-letsencrypt
+spec:
+  gatewayClassName: cilium
+  listeners:
+    - name: https
+      hostname: "*.svc.int.sbrtech.xyz"
+      port: 443
+      protocol: HTTPS
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - group: ""
+            kind: Secret
+            name: svc-int-sbrtech-xyz-tls
+      allowedRoutes:
+        namespaces:
+          from: Selector
+          selector:
+            matchLabels:
+              gateway.sbrtech.xyz/internal: "true"
