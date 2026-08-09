@@ -1,0 +1,14 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: bulk-block
+provisioner: csi.truenas.io
+parameters:
+  protocol: "nvmeof"
+  pool: "bulk-pool"
+  datasetPath: "k8s/control-plane/nvmeof"
+  compression: "LZ4"
+  sparse: "true"
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
+allowVolumeExpansion: true

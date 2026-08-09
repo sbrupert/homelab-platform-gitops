@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: truenas-csi-config
+  namespace: truenas-csi
+data:
+  truenasURL: "wss://prodigy.infra.int.sbrtech.xyz/api/current"
+  truenasInsecure: "false"
+  defaultPool: "ssd-pool"
+
+  # Data-plane addresses should use the storage network.
+  nfsServer: "10.0.5.4"
+  iscsiPortal: "10.0.5.4:3260"
+  nvmeofPortal: "10.0.5.4:4420"
+  iscsiIQNBase: "iqn.2005-10.org.freenas.ctl"

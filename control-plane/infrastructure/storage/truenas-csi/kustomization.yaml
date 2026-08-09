@@ -1,0 +1,18 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - upstream/truenas-csi-driver.yaml
+  - storageclasses
+
+patches:
+  - path: patches/delete-upstream-secret.yaml
+  - path: patches/delete-upstream-namespace.yaml
+  - path: patches/config.yaml
+  - path: patches/controller-scheduling.yaml
+  - path: patches/talos-iscsiadm-path.yaml
+
+images:
+  - name: ghcr.io/truenas/truenas-csi
+    newName: ghcr.io/truenas/truenas-csi
+    digest: sha256:72bc60182c3eb22b524f52c7693ffb2fcd8e8f75ac47c0a2ce0239e78af6bf83
