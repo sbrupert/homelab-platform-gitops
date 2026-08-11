@@ -4,6 +4,8 @@ kind: Gateway
 metadata:
   name: internal
   namespace: platform-networking
+  labels:
+    gateway.sbrtech.xyz/exposure: internal
   annotations:
     cert-manager.io/cluster-issuer: cloudflare-letsencrypt
 spec:
