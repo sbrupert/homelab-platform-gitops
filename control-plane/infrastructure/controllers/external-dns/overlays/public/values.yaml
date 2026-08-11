@@ -27,4 +27,3 @@ spec:
 
     extraArgs:
       gateway-label-filter: gateway.sbrtech.xyz/exposure=public
-      cloudflare-proxied: "false"
