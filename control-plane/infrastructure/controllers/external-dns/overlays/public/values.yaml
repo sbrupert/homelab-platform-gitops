@@ -7,6 +7,8 @@ spec:
   releaseName: external-dns-public
 
   values:
+    replicaCount: 1
+
     provider:
       name: cloudflare
 
@@ -18,6 +20,11 @@ spec:
 
     txtOwnerId: homelab-control-plane-public
 
+    # Periodic drift correction is deliberately slower for the public API.
+    # Kubernetes events still trigger reconciliation, subject to the debounce below.
+    interval: 5m
+    triggerLoopOnEvent: true
+
     env:
       - name: CF_API_TOKEN
         valueFrom:
@@ -27,3 +34,12 @@ spec:
 
     extraArgs:
       gateway-label-filter: gateway.sbrtech.xyz/exposure=public
+
+      # Bound Cloudflare reads and coalesce bursts of Gateway API events.
+      provider-cache-time: 15m
+      cloudflare-dns-records-per-page: 5000
+      min-event-sync-interval: 1m
+
+      # Cloudflare's batch API applies up to 200 changes per request.
+      batch-change-size: 200
+      batch-change-interval: 1s
