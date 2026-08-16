@@ -7,3 +7,4 @@ resources:
   - peer-config.yaml
   - platform-networking-ns.yaml
   - internal-gateway.yaml
+  - public-gateway.yaml

@@ -1,0 +1,30 @@
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: public
+  namespace: platform-networking
+  labels:
+    gateway.sbrtech.xyz/exposure: public
+  annotations:
+    cert-manager.io/cluster-issuer: cloudflare-letsencrypt
+    external-dns.alpha.kubernetes.io/target: hl1.sbrtech.xyz
+spec:
+  gatewayClassName: cilium
+  listeners:
+    - name: sbrtech-https
+      hostname: "*.sbrtech.xyz"
+      port: 443
+      protocol: HTTPS
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - group: ""
+            kind: Secret
+            name: public-sbrtech-xyz-tls
+      allowedRoutes:
+        namespaces:
+          from: Selector
+          selector:
+            matchLabels:
+              gateway.sbrtech.xyz/public: "true"

@@ -11,7 +11,7 @@ metadata:
 spec:
   gatewayClassName: cilium
   listeners:
-    - name: https
+    - name: service-https
       hostname: "*.svc.int.sbrtech.xyz"
       port: 443
       protocol: HTTPS
@@ -21,6 +21,22 @@ spec:
           - group: ""
             kind: Secret
             name: svc-int-sbrtech-xyz-tls
+      allowedRoutes:
+        namespaces:
+          from: Selector
+          selector:
+            matchLabels:
+              gateway.sbrtech.xyz/internal: "true"
+    - name: sbrtech-https
+      hostname: "*.sbrtech.xyz"
+      port: 443
+      protocol: HTTPS
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - group: ""
+            kind: Secret
+            name: internal-sbrtech-xyz-tls
       allowedRoutes:
         namespaces:
           from: Selector
