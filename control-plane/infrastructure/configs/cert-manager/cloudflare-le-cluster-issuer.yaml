@@ -5,6 +5,7 @@ metadata:
 spec:
   acme:
     email: srupert@sbrtech.xyz
+    server: https://acme-v02.api.letsencrypt.org/directory
     privateKeySecretRef:
       name: cloudflare-letsencrypt-account-key
     
