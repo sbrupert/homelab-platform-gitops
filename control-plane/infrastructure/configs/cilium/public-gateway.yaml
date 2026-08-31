@@ -21,7 +21,7 @@ spec:
         certificateRefs:
           - group: ""
             kind: Secret
-            name: public-sbrtech-xyz-tls
+            name: sbrtech-xyz-tls
       allowedRoutes:
         namespaces:
           from: Selector
