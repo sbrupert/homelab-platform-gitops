@@ -39,11 +39,40 @@ spec:
     gatewayAPI:
       enabled: true
 
+    # Talos does not allow Kubernetes workloads to load kernel modules.
+    # Match Cilium's documented Talos capability set instead of the chart
+    # default, which includes SYS_MODULE.
+    securityContext:
+      capabilities:
+        ciliumAgent:
+          - CHOWN
+          - KILL
+          - NET_ADMIN
+          - NET_RAW
+          - IPC_LOCK
+          - SYS_ADMIN
+          - SYS_RESOURCE
+          - DAC_OVERRIDE
+          - FOWNER
+          - SETGID
+          - SETUID
+        cleanCiliumState:
+          - NET_ADMIN
+          - SYS_ADMIN
+          - SYS_RESOURCE
+
+    # The current Talos management cluster has one schedulable node. The
+    # operator uses host ports, so a second replica cannot be scheduled here.
+    operator:
+      replicas: 1
+
     bgpControlPlane:
       enabled: true
 
     hubble:
       enabled: true
+      relay:
+        enabled: true
 
     # Preserve Cilium's upgrade compatibility behavior for the existing
     # bootstrap-installed 1.19.x datapath during the first Helm adoption.
