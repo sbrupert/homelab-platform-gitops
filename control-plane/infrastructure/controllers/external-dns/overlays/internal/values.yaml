@@ -12,6 +12,7 @@ spec:
 
     sources:
       - gateway-httproute
+      - gateway-tlsroute
       - service
 
     domainFilters:
