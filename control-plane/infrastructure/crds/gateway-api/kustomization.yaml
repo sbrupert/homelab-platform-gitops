@@ -1,0 +1,6 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  # Experimental is intentional: it serves both TLSRoute v1 and v1alpha2,
+  # allowing Cilium 1.19 -> 1.20 migration without dropping existing routes.
+  - https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.6.1/experimental-install.yaml
