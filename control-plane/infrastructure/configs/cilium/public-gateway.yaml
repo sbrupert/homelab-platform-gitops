@@ -8,7 +8,7 @@ metadata:
     gateway.sbrtech.xyz/exposure: public
   annotations:
     cert-manager.io/cluster-issuer: cloudflare-letsencrypt
-    external-dns.alpha.kubernetes.io/target: hl1.sbrtech.xyz
+    external-dns.kubernetes.io/target: hl1.sbrtech.xyz
 spec:
   gatewayClassName: cilium
   listeners:

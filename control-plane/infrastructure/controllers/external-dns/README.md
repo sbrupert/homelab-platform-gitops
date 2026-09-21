@@ -2,6 +2,10 @@
 
 This component deploys two ExternalDNS instances from one shared HelmRelease base.
 
+The Helm chart is pinned to `1.22.0` (`external-dns` `v0.22.0`) because the
+`gateway-tlsroute` source in v0.21.0 watches the removed `v1alpha2` TLSRoute API.
+The release uses ExternalDNS's current GA annotation prefix.
+
 | HelmRelease | Provider | Gateway filter | Managed view |
 |---|---|---|---|
 | `external-dns-internal` | RFC2136 | `gateway.sbrtech.xyz/exposure=internal` | Technitium internal DNS |
@@ -12,7 +16,7 @@ The internal instance manages both `svc.int.sbrtech.xyz` and the Technitium inte
 The public instance publishes application records beneath `sbrtech.xyz`. The public Gateway must carry:
 
 ```yaml
-external-dns.alpha.kubernetes.io/target: lab-edge.sbrtech.xyz
+external-dns.kubernetes.io/target: lab-edge.sbrtech.xyz
 ```
 
 The UDM Pro dynamic-DNS integration owns the public `lab-edge.sbrtech.xyz` A record. ExternalDNS owns application CNAMEs that target it.
