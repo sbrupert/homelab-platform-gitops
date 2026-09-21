@@ -4,11 +4,30 @@ metadata:
   name: infrastructure-controllers
   namespace: flux-system
 spec:
+  dependsOn:
+    - name: infrastructure-gateway-api-crds
   interval: 10m
   retryInterval: 1m
   timeout: 10m
   path: ./control-plane/infrastructure/controllers
   prune: true
+  wait: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: infrastructure-gateway-api-crds
+  namespace: flux-system
+spec:
+  interval: 1h
+  retryInterval: 1m
+  timeout: 10m
+  path: ./control-plane/infrastructure/crds/gateway-api
+  # Never prune CRDs: deleting one also deletes every custom resource of that kind.
+  prune: false
   wait: true
   sourceRef:
     kind: GitRepository
