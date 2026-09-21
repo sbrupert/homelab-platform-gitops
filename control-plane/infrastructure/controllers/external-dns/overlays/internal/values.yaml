@@ -33,6 +33,7 @@ spec:
       rfc2136-port: 53
       rfc2136-zone:
         - svc.int.sbrtech.xyz
+        - k8s.int.sbrtech.xyz
         - sbrtech.xyz
       rfc2136-tsig-keyname: external-dns-control-plane
       rfc2136-tsig-secret-alg: hmac-sha256
