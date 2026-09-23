@@ -1,0 +1,11 @@
+apiVersion: cilium.io/v2
+kind: CiliumLoadBalancerIPPool
+metadata:
+  name: tenant-control-plane-vips
+spec:
+  allowFirstLastIPs: "Yes"
+  blocks:
+    - cidr: 10.80.32.64/26
+  serviceSelector:
+    matchLabels:
+      platform.sbrtech.xyz/vip-pool: tenant-control-plane
