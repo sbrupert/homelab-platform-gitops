@@ -13,6 +13,11 @@ The release uses ExternalDNS's current GA annotation prefix.
 
 The internal instance manages both `svc.int.sbrtech.xyz` and the Technitium internal view of `sbrtech.xyz`. The RFC2136 provider selects the most-specific configured zone for each endpoint. Both zones intentionally share the existing TSIG identity and TXT owner ID because they use the same Technitium backend and operational lifecycle.
 
+The internal instance enables RFC2136 AXFR so `policy: sync` can list existing
+records. Technitium must permit AXFR for each managed zone using the
+`external-dns-control-plane` TSIG key and an ACL restricted to the management
+cluster's actual egress source addresses.
+
 The public instance publishes application records beneath `sbrtech.xyz`. The public Gateway must carry:
 
 ```yaml
