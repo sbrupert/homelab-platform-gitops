@@ -73,7 +73,3 @@ spec:
       enabled: true
       relay:
         enabled: true
-
-    # Preserve Cilium's upgrade compatibility behavior for the existing
-    # bootstrap-installed 1.19.x datapath during the first Helm adoption.
-    upgradeCompatibility: "1.19"
