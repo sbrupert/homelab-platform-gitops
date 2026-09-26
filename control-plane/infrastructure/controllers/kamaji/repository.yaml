@@ -1,8 +1,12 @@
 apiVersion: source.toolkit.fluxcd.io/v1
-kind: HelmRepository
+kind: GitRepository
 metadata:
   name: kamaji
   namespace: kamaji-system
 spec:
   interval: 1h
-  url: https://clastix.github.io/charts
+  url: https://github.com/clastix/kamaji.git
+  ref:
+    # Public edge release 26.8.2-edge. Pin the commit rather than the mutable
+    # release tag so Flux always renders the matching chart and CRDs.
+    commit: ddbabd87ed0e8d7c319414383e153c46f21733a9

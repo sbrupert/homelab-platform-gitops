@@ -10,13 +10,12 @@ spec:
   targetNamespace: kamaji-system
   chart:
     spec:
-      chart: kamaji
-      # Public chart package digest from clastix.github.io/charts/index.yaml:
-      # sha256:2e642a485eae8bd964c0a363b4ce01bd8379d05b42960b7919676f96f7c63b36
-      version: 1.0.0
+      # Keep the chart and CRDs aligned with the controller edge release.
+      chart: ./charts/kamaji
       sourceRef:
-        kind: HelmRepository
+        kind: GitRepository
         name: kamaji
+        namespace: kamaji-system
   driftDetection:
     mode: enabled
   install:
@@ -38,17 +37,15 @@ spec:
             patch: |-
               - op: replace
                 path: /spec/template/spec/containers/0/image
-                value: clastix/kamaji@sha256:d54553535ad43ef48dae79e416474e72f44292abeb252f6483a1aeb3b7b3cdc2
+                value: clastix/kamaji@sha256:86ca4488e00dcac850ee23a64f878bc1988f47092ab0c5fc8763c1cff1003880
   values:
-    # Chart 1.0.0 has appVersion v1.0.0. Keep the controller explicitly
-    # aligned with the chart instead of inheriting a moving chart default.
-    # Verified Docker Hub OCI index digest:
-    # sha256:d54553535ad43ef48dae79e416474e72f44292abeb252f6483a1aeb3b7b3cdc2
+    # Kamaji 26.8.2-edge; the post-renderer above pins the matching
+    # multi-architecture Docker Hub OCI index digest.
     etcd:
       deploy: true
       persistence:
         storageClassName: fast-block
     image:
       repository: clastix/kamaji
-      tag: v1.0.0
+      tag: 26.8.2-edge
       pullPolicy: IfNotPresent
