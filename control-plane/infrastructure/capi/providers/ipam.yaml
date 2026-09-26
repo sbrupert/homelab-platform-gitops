@@ -7,3 +7,29 @@ spec:
   version: v1.1.1
   fetchConfig:
     url: https://github.com/kubernetes-sigs/cluster-api-ipam-provider-in-cluster/releases/download/v1.1.1/ipam-components.yaml
+  # v1.1.1 exposes secure metrics on :8443, while its upstream Service targets
+  # an undeclared named port. Match the CAPMOX workaround until this upstream
+  # manifest is corrected.
+  patches:
+    - target:
+        group: apps
+        version: v1
+        kind: Deployment
+        name: capi-ipam-in-cluster-controller-manager
+        namespace: capi-ipam-in-cluster-system
+      patch: |-
+        - op: add
+          path: /spec/template/spec/containers/0/ports/-
+          value:
+            containerPort: 8443
+            name: metrics
+            protocol: TCP
+    - target:
+        version: v1
+        kind: Service
+        name: capi-ipam-in-cluster-controller-manager-metrics-service
+        namespace: capi-ipam-in-cluster-system
+      patch: |-
+        - op: replace
+          path: /spec/ports/0/targetPort
+          value: metrics
