@@ -59,6 +59,7 @@ metadata:
 spec:
   dependsOn:
     - name: infrastructure-capi-operator
+    - name: infrastructure-kamaji
   interval: 10m
   retryInterval: 1m
   timeout: 20m
@@ -149,6 +150,7 @@ metadata:
 spec:
   dependsOn:
     - name: infrastructure-cilium-secrets
+    - name: infrastructure-cert-manager-configs
   interval: 10m
   retryInterval: 1m
   timeout: 5m
@@ -225,6 +227,25 @@ spec:
   retryInterval: 1m
   timeout: 10m
   path: ./control-plane/infrastructure/storage/truenas-csi
+  prune: true
+  wait: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: infrastructure-kamaji
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: infrastructure-controllers
+    - name: infrastructure-truenas-csi
+  interval: 10m
+  retryInterval: 1m
+  timeout: 10m
+  path: ./control-plane/infrastructure/controllers/kamaji
   prune: true
   wait: true
   sourceRef:

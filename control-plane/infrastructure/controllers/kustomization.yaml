@@ -4,6 +4,5 @@ resources:
   - cilium
   - cert-manager
   - external-secrets
-  - kamaji
   - external-dns/namespace.yaml
   - external-snapshotter
