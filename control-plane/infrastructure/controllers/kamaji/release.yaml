@@ -41,9 +41,9 @@ spec:
   values:
     # Kamaji 26.8.2-edge; the post-renderer above pins the matching
     # multi-architecture Docker Hub OCI index digest.
-    etcd:
+    kamaji-etcd:
       deploy: true
-      persistence:
+      persistentVolumeClaim:
         storageClassName: fast-block
     image:
       repository: clastix/kamaji
