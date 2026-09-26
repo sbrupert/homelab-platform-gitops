@@ -1,0 +1,54 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: kamaji
+  namespace: kamaji-system
+spec:
+  interval: 30m
+  timeout: 10m
+  releaseName: kamaji
+  targetNamespace: kamaji-system
+  chart:
+    spec:
+      chart: kamaji
+      # Public chart package digest from clastix.github.io/charts/index.yaml:
+      # sha256:2e642a485eae8bd964c0a363b4ce01bd8379d05b42960b7919676f96f7c63b36
+      version: 1.0.0
+      sourceRef:
+        kind: HelmRepository
+        name: kamaji
+  driftDetection:
+    mode: enabled
+  install:
+    crds: CreateReplace
+    strategy:
+      name: RetryOnFailure
+      retryInterval: 5m
+  upgrade:
+    crds: CreateReplace
+    strategy:
+      name: RetryOnFailure
+      retryInterval: 5m
+  postRenderers:
+    - kustomize:
+        patches:
+          - target:
+              kind: Deployment
+              name: kamaji
+            patch: |-
+              - op: replace
+                path: /spec/template/spec/containers/0/image
+                value: clastix/kamaji@sha256:d54553535ad43ef48dae79e416474e72f44292abeb252f6483a1aeb3b7b3cdc2
+  values:
+    # Chart 1.0.0 has appVersion v1.0.0. Keep the controller explicitly
+    # aligned with the chart instead of inheriting a moving chart default.
+    # Verified Docker Hub OCI index digest:
+    # sha256:d54553535ad43ef48dae79e416474e72f44292abeb252f6483a1aeb3b7b3cdc2
+    etcd:
+      deploy: true
+      persistence:
+        storageClassName: fast-block
+    image:
+      repository: clastix/kamaji
+      tag: v1.0.0
+      pullPolicy: IfNotPresent
