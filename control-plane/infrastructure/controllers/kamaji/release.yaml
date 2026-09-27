@@ -49,3 +49,33 @@ spec:
       repository: clastix/kamaji
       tag: 26.8.2-edge
       pullPolicy: IfNotPresent
+    controlPlane:
+      deployment:
+        resources:
+          apiServer:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              memory: 768Mi
+          controllerManager:
+            requests:
+              cpu: 125m
+              memory: 256Mi
+            limits:
+              memory: 384Mi
+          scheduler:
+            requests:
+              cpu: 125m
+              memory: 256Mi
+            limits:
+              memory: 256Mi
+    addons:
+      konnectivity:
+        server:
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              memory: 256Mi
