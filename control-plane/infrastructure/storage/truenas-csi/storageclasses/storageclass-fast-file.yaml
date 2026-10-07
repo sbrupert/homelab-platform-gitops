@@ -10,6 +10,6 @@ parameters:
   compression: "LZ4"
   nfs.mountOptions: "hard,nfsvers=4.1"
   nfs.rootSquash: "false"
-reclaimPolicy: Delete
+reclaimPolicy: Retain
 volumeBindingMode: Immediate
 allowVolumeExpansion: true

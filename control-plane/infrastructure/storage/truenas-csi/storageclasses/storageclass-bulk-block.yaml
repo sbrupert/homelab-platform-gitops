@@ -9,6 +9,6 @@ parameters:
   datasetPath: "k8s/control-plane/nvmeof"
   compression: "LZ4"
   sparse: "true"
-reclaimPolicy: Delete
+reclaimPolicy: Retain
 volumeBindingMode: Immediate
 allowVolumeExpansion: true
