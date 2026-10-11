@@ -1,0 +1,83 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: backup-velero-credentials
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: infrastructure-external-secrets-configs
+  interval: 10m
+  retryInterval: 1m
+  timeout: 5m
+  path: ./control-plane/backup/velero/credentials
+  prune: true
+  wait: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  healthCheckExprs:
+    - apiVersion: external-secrets.io/v1
+      kind: ExternalSecret
+      current: >-
+        has(status.conditions) &&
+        status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: backup-velero
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: backup-velero-credentials
+  interval: 10m
+  retryInterval: 1m
+  timeout: 15m
+  path: ./control-plane/backup/velero/app
+  prune: true
+  wait: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+# ---
+# apiVersion: kustomize.toolkit.fluxcd.io/v1
+# kind: Kustomization
+# metadata:
+#   name: backup-talos-etcd-credentials
+#   namespace: flux-system
+# spec:
+#   dependsOn:
+#     - name: infrastructure-external-secrets-configs
+#   interval: 10m
+#   retryInterval: 1m
+#   timeout: 5m
+#   path: ./control-plane/backup/talos-etcd/credentials
+#   prune: true
+#   wait: true
+#   sourceRef:
+#     kind: GitRepository
+#     name: flux-system
+#   healthCheckExprs:
+#     - apiVersion: external-secrets.io/v1
+#       kind: ExternalSecret
+#       current: >-
+#         has(status.conditions) &&
+#         status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
+# ---
+# apiVersion: kustomize.toolkit.fluxcd.io/v1
+# kind: Kustomization
+# metadata:
+#   name: backup-talos-etcd
+#   namespace: flux-system
+# spec:
+#   dependsOn:
+#     - name: backup-talos-etcd-credentials
+#   interval: 10m
+#   retryInterval: 1m
+#   timeout: 5m
+#   path: ./control-plane/backup/talos-etcd/app
+#   prune: true
+#   wait: true
+#   sourceRef:
+#     kind: GitRepository
+#     name: flux-system
