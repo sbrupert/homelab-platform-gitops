@@ -1,0 +1,67 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: talos-backup
+  namespace: kube-system
+spec:
+  schedule: "0 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: talos-backup
+              image: ghcr.io/siderolabs/talos-backup:v0.1.0-beta.3-10-gb9fd478@sha256:7fc186ff37a3137f470082cb609bf1dc3bcece13dd9a6421ec09cfdf4f33ae6c
+              imagePullPolicy: IfNotPresent
+              command:
+                - /talos-backup
+              workingDir: /tmp
+              envFrom:
+                - secretRef:
+                    name: talos-etcd-garage-credentials
+              env:
+                - name: AWS_REGION
+                  value: hl1
+                - name: CUSTOM_S3_ENDPOINT
+                  value: https://s3.san.int.sbrtech.xyz
+                - name: USE_PATH_STYLE
+                  value: "true"
+                - name: BUCKET
+                  value: talos-etcd-control-plane
+                - name: CLUSTER_NAME
+                  value: control-plane
+                - name: S3_PREFIX
+                  value: etcd
+                - name: ENABLE_COMPRESSION
+                  value: "true"
+              securityContext:
+                runAsUser: 1000
+                runAsGroup: 1000
+                runAsNonRoot: true
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop:
+                    - ALL
+                seccompProfile:
+                  type: RuntimeDefault
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+                - name: talos
+                  mountPath: /.talos
+                - name: talos-secrets
+                  mountPath: /var/run/secrets/talos.dev
+                  readOnly: true
+          volumes:
+            - name: tmp
+              emptyDir: {}
+            - name: talos
+              emptyDir: {}
+            - name: talos-secrets
+              secret:
+                secretName: talos-backup-secrets
