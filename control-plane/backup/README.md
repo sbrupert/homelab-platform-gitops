@@ -23,11 +23,11 @@ See [the backup strategy](../../docs/kubernetes-backup-strategy.md) for the reco
    ```
 
 2. Create a dedicated Garage bucket named `talos-etcd-control-plane` with a 10 GiB quota and a key with read/write access to that bucket only. Do not reuse the Velero key. Configure the 14-day `etcd/` lifecycle rule separately, as shown below.
-3. Generate an age keypair with `age-keygen -o "$SAFE_KEY_PATH"`, where `SAFE_KEY_PATH` is outside this repository. Get its public recipient with `age-keygen -y "$SAFE_KEY_PATH"`. Keep the **private key outside Kubernetes and outside the Garage-only failure domain**, with a documented way to retrieve it during a total cluster outage. Only the public `age1…` recipient goes into 1Password.
+3. Generate an age keypair with `age-keygen -o "$SAFE_KEY_PATH"`, where `SAFE_KEY_PATH` is outside this repository. Get its public recipient with `age-keygen -y "$SAFE_KEY_PATH"`. Store the private identity in 1Password as described below, outside Kubernetes and the Garage-only failure domain. Ensure 1Password remains accessible during a total cluster outage; keep a separately protected recovery copy of the private identity as well.
 4. In the `Control Plane` 1Password vault, provide these two items:
 
    - `talos-etcd-s3-bucket-key-control-plane`: `username` is the Garage access key ID; `password` is its secret access key.
-   - `talos-etcd-s3-bucket-age-key-control-plane`: `username` is the public `age1…` recipient. Do not put the private key in this item.
+   - `talos-etcd-s3-bucket-age-key-control-plane`: `username` is the public `age1…` recipient; `credential` is the private age identity. Only `username` is synced into Kubernetes by the ExternalSecret. Protect access to `credential` because it can decrypt every backup made for that recipient.
 
    The Talos ExternalSecret will not become Ready, so its CronJob will not be installed, until all three values resolve.
 
@@ -66,7 +66,7 @@ Each credential Kustomization waits for its ExternalSecret to report `Ready=True
 
 1. Check all four `backup-*` Flux Kustomizations. If the Talos credential one is not Ready, inspect the ExternalSecret and the prerequisite 1Password item; do not substitute a dummy age key.
 2. Confirm the normal Velero Deployment does **not** have `--restore-only`, its default BackupStorageLocation is `Available` and `ReadWrite`, and `Schedule/velero-cluster-resources` exists. Inspect a completed scheduled or manual backup's actual resource list; do not infer scope merely from `Completed` status.
-3. Trigger a one-off Talos backup Job from `CronJob/talos-backup` in `kube-system`; wait for completion and inspect its logs. Confirm that an encrypted object appears in the dedicated Garage bucket. Download a copy **from outside the cluster**, decrypt it with the offline age private key, and run a disposable restore drill before treating the schedule as proven.
+3. Trigger a one-off Talos backup Job from `CronJob/talos-backup` in `kube-system`; wait for completion and inspect its logs. Confirm that an encrypted object appears in the dedicated Garage bucket. Download a copy **from outside the cluster**, decrypt it with the private age identity in the 1Password `credential` field (or its separately protected recovery copy), and run a disposable restore drill before treating the schedule as proven.
 4. Test the recovery-to-normal Flux path switch separately. The normal Velero Kustomization must adopt the recovery-orphaned HelmRelease and change it to ReadWrite without deleting the installation.
 
 An in-cluster CronJob cannot run after the Kubernetes API/cluster is lost. The snapshot, its decryption key, and the original Talos machine configuration/cluster secrets must all remain accessible without that cluster.
