@@ -1,0 +1,77 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: infrastructure-crossplane
+  namespace: flux-system
+spec:
+  interval: 10m
+  retryInterval: 1m
+  timeout: 10m
+  path: ./control-plane/infrastructure/crossplane/install
+  prune: true
+  wait: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: infrastructure-crossplane-functions
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: infrastructure-crossplane
+  interval: 10m
+  retryInterval: 1m
+  timeout: 10m
+  path: ./control-plane/infrastructure/crossplane/functions
+  prune: true
+  wait: false
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  healthChecks:
+    - apiVersion: pkg.crossplane.io/v1
+      kind: Function
+      name: function-go-templating
+  healthCheckExprs:
+    - apiVersion: pkg.crossplane.io/v1
+      kind: Function
+      current: >-
+        !has(metadata.deletionTimestamp) &&
+        has(status.conditions) &&
+        status.conditions.exists(c, c.type == 'Installed' && c.status == 'True') &&
+        status.conditions.exists(c, c.type == 'Healthy' && c.status == 'True')
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: infrastructure-tenant-cluster-api
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: infrastructure-crossplane-functions
+    - name: infrastructure-capi-classes
+    - name: infrastructure-capi-addon-profiles
+  interval: 10m
+  retryInterval: 1m
+  timeout: 10m
+  path: ./control-plane/infrastructure/crossplane/tenant-cluster
+  prune: true
+  wait: false
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  healthChecks:
+    - apiVersion: apiextensions.crossplane.io/v2
+      kind: CompositeResourceDefinition
+      name: tenantclusters.platform.sbrtech.xyz
+  healthCheckExprs:
+    - apiVersion: apiextensions.crossplane.io/v2
+      kind: CompositeResourceDefinition
+      current: >-
+        !has(metadata.deletionTimestamp) &&
+        has(status.conditions) &&
+        status.conditions.exists(c, c.type == 'Established' && c.status == 'True') &&
+        status.conditions.exists(c, c.type == 'WatchingCompositeResource' && c.status == 'True')
