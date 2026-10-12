@@ -73,5 +73,9 @@ spec:
       current: >-
         !has(metadata.deletionTimestamp) &&
         has(status.conditions) &&
-        status.conditions.exists(c, c.type == 'Established' && c.status == 'True') &&
-        status.conditions.exists(c, c.type == 'WatchingCompositeResource' && c.status == 'True')
+        status.conditions.exists(c,
+          c.type == 'Established' &&
+          c.status == 'True' &&
+          c.reason == 'WatchingCompositeResource' &&
+          c.observedGeneration == metadata.generation
+        )
