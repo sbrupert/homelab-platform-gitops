@@ -169,6 +169,15 @@ spec:
           sshAuthorizedKeys:
             - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJgtGmBPb8KZdua4gM/E7y+YR1/C5yGp5ezbz87vOe1e
 ---
+apiVersion: ipam.cluster.x-k8s.io/v1alpha2
+kind: GlobalInClusterIPPool
+metadata:
+  name: platform-san-node-ips
+spec:
+  addresses:
+    - 10.0.5.101-10.0.5.254
+  prefix: 24
+---
 apiVersion: cluster.x-k8s.io/v1beta2
 kind: ClusterClass
 metadata:
