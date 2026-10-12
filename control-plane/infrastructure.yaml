@@ -189,6 +189,69 @@ spec:
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
+  name: infrastructure-capi-credentials
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: infrastructure-capi-providers
+    - name: infrastructure-external-secrets-configs
+  interval: 10m
+  retryInterval: 1m
+  timeout: 5m
+  path: ./control-plane/infrastructure/configs/secrets/capi
+  prune: true
+  wait: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  healthCheckExprs:
+    - apiVersion: external-secrets.io/v1
+      kind: ExternalSecret
+      current: >-
+        has(status.conditions) &&
+        status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: infrastructure-capi-classes
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: infrastructure-capi-providers
+    - name: infrastructure-capi-credentials
+  interval: 10m
+  retryInterval: 1m
+  timeout: 10m
+  path: ./control-plane/infrastructure/capi/classes
+  prune: true
+  wait: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: infrastructure-capi-addon-profiles
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: infrastructure-capi-providers
+    - name: infrastructure-capi-classes
+  interval: 10m
+  retryInterval: 1m
+  timeout: 10m
+  path: ./control-plane/infrastructure/capi/addon-profiles
+  prune: true
+  wait: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
   name: infrastructure-external-secrets-configs
   namespace: flux-system
 spec:

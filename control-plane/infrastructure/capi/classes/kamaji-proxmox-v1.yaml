@@ -1,0 +1,281 @@
+# Reusable Kamaji hosted-control-plane / CAPMOX worker ClusterClass.
+#
+# A Cluster using this class must:
+#   - be created in the same namespace as these resources, unless classRef.namespace
+#     is set explicitly;
+#   - set platform.sbrtech.xyz/networking=managed-cilium so the shared
+#     HelmChartProxy selects it; and
+#   - provide managementIPv4Config with addresses reserved for that cluster by
+#     the platform IPAM orchestrator.
+#
+# Crossplane is expected to reserve management addresses from the shared
+# GlobalInClusterIPPool before it creates or scales a topology Cluster. CAPMOX
+# then consumes those reserved addresses through the generated per-cluster
+# InClusterIPPool. Do not add the management GlobalInClusterIPPool to net0: pool
+# references are additive and would give each VM a second management address.
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1alpha2
+kind: ProxmoxClusterTemplate
+metadata:
+  name: kamaji-proxmox-v1
+  namespace: capmox-system
+spec:
+  template:
+    spec:
+      # Kamaji hosts the control plane in the management cluster; CAPMOX only
+      # provisions tenant worker VMs.
+      externalManagedControlPlane: true
+      credentialsRef:
+        name: capmox-manager-credentials
+      # ProxmoxClusterTemplate admission requires a valid IP configuration.
+      # The ClusterClass requires managementIPv4Config and replaces this
+      # documentation-only TEST-NET configuration before a ProxmoxCluster is
+      # created.
+      ipv4Config:
+        addresses:
+          - 192.0.2.10
+        prefix: 24
+        gateway: 192.0.2.1
+      dnsServers:
+        - 10.80.20.1
+---
+apiVersion: controlplane.cluster.x-k8s.io/v1alpha2
+kind: KamajiControlPlaneTemplate
+metadata:
+  name: kamaji-proxmox-v1
+  namespace: capmox-system
+spec:
+  template:
+    spec:
+      dataStoreName: default
+      # These are resources for the containers in each hosted tenant-control-
+      # plane Pod, not for the Kamaji controller Deployment.
+      apiServer:
+        resources:
+          requests:
+            cpu: 250m
+            memory: 512Mi
+          limits:
+            memory: 768Mi
+      controllerManager:
+        resources:
+          requests:
+            cpu: 125m
+            memory: 256Mi
+          limits:
+            memory: 384Mi
+      scheduler:
+        resources:
+          requests:
+            cpu: 125m
+            memory: 256Mi
+          limits:
+            memory: 256Mi
+      addons:
+        coreDNS: {}
+        konnectivity:
+          server:
+            version: v0.36.0
+            port: 8132
+            resources:
+              requests:
+                cpu: 100m
+                memory: 128Mi
+              limits:
+                memory: 256Mi
+          agent:
+            version: v0.36.0
+      kubelet:
+        cgroupfs: systemd
+        preferredAddressTypes:
+          - InternalIP
+          - Hostname
+      network:
+        serviceType: LoadBalancer
+        serviceLabels:
+          platform.sbrtech.xyz/vip-pool: tenant-control-plane
+        # The ClusterClass replaces the placeholder with:
+        #   <cluster-name>.<apiDomain>
+        serviceAnnotations:
+          external-dns.kubernetes.io/hostname: placeholder.invalid
+      deployment:
+        strategy:
+          type: RollingUpdate
+          rollingUpdate:
+            maxSurge: 1
+            maxUnavailable: 0
+        topologySpreadConstraints:
+          - maxSkew: 1
+            topologyKey: kubernetes.io/hostname
+            whenUnsatisfiable: ScheduleAnyway
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1alpha2
+kind: ProxmoxMachineTemplate
+metadata:
+  name: kamaji-proxmox-v1-standard-worker
+  namespace: capmox-system
+spec:
+  template:
+    spec:
+      sourceNode: hl1ph04
+      templateID: 2006
+      pool: platform-capi-tenants
+      format: raw
+      full: true
+      numSockets: 1
+      numCores: 4
+      memoryMiB: 8192
+      disks:
+        bootVolume:
+          disk: scsi0
+          sizeGb: 32
+      network:
+        networkDevices:
+          - name: net0
+            bridge: vmm820
+            model: virtio
+            # This selects the generated CAPMOX per-cluster pool, whose exact
+            # addresses are supplied through managementIPv4Config.
+            defaultIPv4: true
+          - name: net1
+            bridge: vmbr1
+            model: virtio
+            defaultIPv4: false
+            ipPoolRef:
+              - apiGroup: ipam.cluster.x-k8s.io
+                kind: GlobalInClusterIPPool
+                name: platform-san-node-ips
+      checks:
+        skipQemuGuestAgent: false
+        skipCloudInitStatus: false
+      metadataSettings:
+        providerIDInjection: true
+---
+apiVersion: bootstrap.cluster.x-k8s.io/v1beta2
+kind: KubeadmConfigTemplate
+metadata:
+  name: kamaji-proxmox-v1-standard-worker
+  namespace: capmox-system
+spec:
+  template:
+    spec:
+      joinConfiguration:
+        nodeRegistration:
+          kubeletExtraArgs:
+            - name: provider-id
+              value: proxmox://{{ ds.meta_data.instance_id }}
+      users:
+        - name: root
+          sshAuthorizedKeys:
+            - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJgtGmBPb8KZdua4gM/E7y+YR1/C5yGp5ezbz87vOe1e
+---
+apiVersion: cluster.x-k8s.io/v1beta2
+kind: ClusterClass
+metadata:
+  name: kamaji-proxmox-v1
+  namespace: capmox-system
+spec:
+  # The class is initially certified for this exact Kubernetes release. A new
+  # class revision or version-aware patches should accompany future minor
+  # upgrades so Konnectivity and other platform components remain compatible.
+  kubernetesVersions:
+    - v1.36.4
+
+  infrastructure:
+    templateRef:
+      apiVersion: infrastructure.cluster.x-k8s.io/v1alpha2
+      kind: ProxmoxClusterTemplate
+      name: kamaji-proxmox-v1
+
+  controlPlane:
+    templateRef:
+      apiVersion: controlplane.cluster.x-k8s.io/v1alpha2
+      kind: KamajiControlPlaneTemplate
+      name: kamaji-proxmox-v1
+
+  workers:
+    machineDeployments:
+      - class: standard-worker
+        metadata:
+          labels:
+            node-role.kubernetes.io/worker: ""
+        bootstrap:
+          templateRef:
+            apiVersion: bootstrap.cluster.x-k8s.io/v1beta2
+            kind: KubeadmConfigTemplate
+            name: kamaji-proxmox-v1-standard-worker
+        infrastructure:
+          templateRef:
+            apiVersion: infrastructure.cluster.x-k8s.io/v1alpha2
+            kind: ProxmoxMachineTemplate
+            name: kamaji-proxmox-v1-standard-worker
+
+  variables:
+    - name: managementIPv4Config
+      required: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          description: >-
+            Management addresses reserved by the platform for every CAPMOX
+            Machine in this cluster, including rollout capacity.
+          required:
+            - addresses
+            - prefix
+            - gateway
+          properties:
+            addresses:
+              type: array
+              minItems: 1
+              items:
+                type: string
+            prefix:
+              type: integer
+              minimum: 1
+              maximum: 32
+            gateway:
+              type: string
+              minLength: 1
+            metric:
+              type: integer
+              minimum: 0
+              default: 100
+    - name: apiDomain
+      required: false
+      schema:
+        openAPIV3Schema:
+          type: string
+          description: DNS domain appended to the Cluster name for its API endpoint.
+          default: k8s.int.sbrtech.xyz
+          minLength: 1
+
+  patches:
+    - name: management-ipv4-config
+      description: >-
+        Replace the ProxmoxClusterTemplate placeholder with addresses reserved
+        by the platform IPAM orchestrator.
+      definitions:
+        - selector:
+            apiVersion: infrastructure.cluster.x-k8s.io/v1alpha2
+            kind: ProxmoxClusterTemplate
+            matchResources:
+              infrastructureCluster: true
+          jsonPatches:
+            - op: replace
+              path: /spec/template/spec/ipv4Config
+              valueFrom:
+                variable: managementIPv4Config
+
+    - name: tenant-api-hostname
+      description: Configure external-dns with <cluster-name>.<apiDomain>.
+      definitions:
+        - selector:
+            apiVersion: controlplane.cluster.x-k8s.io/v1alpha2
+            kind: KamajiControlPlaneTemplate
+            matchResources:
+              controlPlane: true
+          jsonPatches:
+            - op: replace
+              path: /spec/template/spec/network/serviceAnnotations/external-dns.kubernetes.io~1hostname
+              valueFrom:
+                template: '{{ .builtin.cluster.name }}.{{ .apiDomain }}'
