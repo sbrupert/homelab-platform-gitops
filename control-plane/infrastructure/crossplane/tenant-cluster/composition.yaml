@@ -1,0 +1,93 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: tenant-cluster-kamaji-proxmox-v1
+spec:
+  compositeTypeRef:
+    apiVersion: platform.sbrtech.xyz/v1alpha1
+    kind: TenantCluster
+  mode: Pipeline
+  pipeline:
+    - step: render-capi-cluster
+      functionRef:
+        name: function-go-templating
+      input:
+        apiVersion: gotemplating.fn.crossplane.io/v1beta1
+        kind: GoTemplate
+        source: Inline
+        options:
+          - missingkey=error
+        inline:
+          template: |
+            {{- $xr := .observed.composite.resource -}}
+            {{- $spec := $xr.spec -}}
+            {{- if ne $xr.metadata.namespace "capmox-system" -}}
+            {{- fail "TenantCluster must be created in capmox-system" -}}
+            {{- end -}}
+            {{- $cluster := getComposedResource . "cluster" -}}
+            {{- $ready := false -}}
+            {{- if $cluster -}}
+              {{- if not (get $cluster.metadata "deletionTimestamp") -}}
+                {{- $status := get $cluster "status" | default dict -}}
+                {{- range (get $status "conditions" | default list) -}}
+                  {{- if and (eq .type "Available") (eq .status "True") -}}
+                    {{- $ready = true -}}
+                  {{- end -}}
+                {{- end -}}
+              {{- end -}}
+            {{- end }}
+            apiVersion: cluster.x-k8s.io/v1beta2
+            kind: Cluster
+            metadata:
+              name: {{ $xr.metadata.name | quote }}
+              namespace: {{ $xr.metadata.namespace | quote }}
+              annotations:
+                gotemplating.fn.crossplane.io/composition-resource-name: cluster
+                gotemplating.fn.crossplane.io/ready: {{ ternary "True" "False" $ready | quote }}
+              labels:
+                platform.sbrtech.xyz/networking: managed-cilium
+            spec:
+              clusterNetwork:
+                pods:
+                  cidrBlocks:
+                    - {{ $spec.podCIDR | quote }}
+                services:
+                  cidrBlocks:
+                    - {{ $spec.serviceCIDR | quote }}
+                serviceDomain: cluster.local
+              topology:
+                classRef:
+                  name: kamaji-proxmox-v1
+                version: {{ $spec.kubernetesVersion | quote }}
+                controlPlane:
+                  replicas: {{ $spec.controlPlaneReplicas }}
+                workers:
+                  machineDeployments:
+                    - class: standard-worker
+                      name: workers
+                      replicas: {{ $spec.workerReplicas }}
+                variables:
+                  - name: managementIPv4Config
+                    value:
+            {{ $spec.managementIPv4Config | toYaml | indent 12 }}
+                  - name: apiDomain
+                    value: {{ $spec.apiDomain | quote }}
+            ---
+            apiVersion: platform.sbrtech.xyz/v1alpha1
+            kind: TenantCluster
+            metadata:
+              annotations:
+                gotemplating.fn.crossplane.io/ready: {{ ternary "True" "False" $ready | quote }}
+            status:
+              clusterRef:
+                apiVersion: cluster.x-k8s.io/v1beta2
+                kind: Cluster
+                name: {{ $xr.metadata.name | quote }}
+                namespace: {{ $xr.metadata.namespace | quote }}
+            {{- if $cluster }}
+              {{- $clusterSpec := get $cluster "spec" | default dict }}
+              {{- with (get $clusterSpec "controlPlaneEndpoint") }}
+              controlPlaneEndpoint:
+            {{ . | toYaml | indent 4 }}
+              {{- end }}
+            {{- end }}

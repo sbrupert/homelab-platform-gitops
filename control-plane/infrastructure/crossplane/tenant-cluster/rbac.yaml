@@ -1,0 +1,22 @@
+# Native CAPI resources are not installed by a Crossplane Provider.
+# Aggregate only Cluster permissions into Crossplane's existing primary role.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: crossplane-compose-capi-clusters
+  labels:
+    rbac.crossplane.io/aggregate-to-crossplane: "true"
+rules:
+  - apiGroups:
+      - cluster.x-k8s.io
+    resources:
+      - clusters
+      - clusters/finalizers
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete

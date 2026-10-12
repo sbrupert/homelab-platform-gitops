@@ -1,0 +1,101 @@
+apiVersion: apiextensions.crossplane.io/v2
+kind: CompositeResourceDefinition
+metadata:
+  name: tenantclusters.platform.sbrtech.xyz
+spec:
+  scope: Namespaced
+  group: platform.sbrtech.xyz
+  names:
+    kind: TenantCluster
+    plural: tenantclusters
+  defaultCompositionRef:
+    name: tenant-cluster-kamaji-proxmox-v1
+  enforcedCompositionRef:
+    name: tenant-cluster-kamaji-proxmox-v1
+  versions:
+    - name: v1alpha1
+      served: true
+      referenceable: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          required:
+            - spec
+          properties:
+            spec:
+              type: object
+              required:
+                - managementIPv4Config
+              properties:
+                managementIPv4Config:
+                  type: object
+                  description: >-
+                    Caller-reserved management addresses, including worker
+                    rollout capacity. This API does not allocate addresses.
+                  required:
+                    - addresses
+                    - prefix
+                    - gateway
+                  properties:
+                    addresses:
+                      type: array
+                      minItems: 1
+                      items:
+                        type: string
+                    prefix:
+                      type: integer
+                      minimum: 1
+                      maximum: 32
+                    gateway:
+                      type: string
+                      minLength: 1
+                    metric:
+                      type: integer
+                      minimum: 0
+                      default: 100
+                apiDomain:
+                  type: string
+                  minLength: 1
+                  default: k8s.int.sbrtech.xyz
+                kubernetesVersion:
+                  type: string
+                  enum:
+                    - v1.36.4
+                  default: v1.36.4
+                controlPlaneReplicas:
+                  type: integer
+                  minimum: 1
+                  default: 3
+                workerReplicas:
+                  type: integer
+                  minimum: 0
+                  default: 1
+                podCIDR:
+                  type: string
+                  minLength: 1
+                  default: 10.52.0.0/16
+                serviceCIDR:
+                  type: string
+                  minLength: 1
+                  default: 10.53.0.0/16
+            status:
+              type: object
+              properties:
+                clusterRef:
+                  type: object
+                  properties:
+                    apiVersion:
+                      type: string
+                    kind:
+                      type: string
+                    name:
+                      type: string
+                    namespace:
+                      type: string
+                controlPlaneEndpoint:
+                  type: object
+                  properties:
+                    host:
+                      type: string
+                    port:
+                      type: integer
