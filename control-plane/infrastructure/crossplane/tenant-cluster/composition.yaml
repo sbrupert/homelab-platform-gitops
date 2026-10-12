@@ -26,15 +26,47 @@ spec:
             {{- end -}}
             {{- $cluster := getComposedResource . "cluster" -}}
             {{- $ready := false -}}
-            {{- if $cluster -}}
-              {{- if not (get $cluster.metadata "deletionTimestamp") -}}
+            {{- $progress := list -}}
+            {{- $stages := list
+              (dict "name" "control-plane" "conditionType" "ControlPlaneReady" "sourceCondition" "ControlPlaneAvailable")
+              (dict "name" "workers" "conditionType" "WorkersReady" "sourceCondition" "WorkersAvailable")
+              (dict "name" "cluster-health" "conditionType" "ClusterAvailable" "sourceCondition" "Available") -}}
+            {{- range $stage := $stages -}}
+              {{- $state := "Pending" -}}
+              {{- $conditionStatus := "Unknown" -}}
+              {{- $reason := "WaitingForCluster" -}}
+              {{- $message := "Waiting for the CAPI Cluster to be observed" -}}
+              {{- if $cluster -}}
+                {{- $reason = "WaitingForCondition" -}}
+                {{- $message = printf "Waiting for CAPI to report %s" $stage.sourceCondition -}}
                 {{- $status := get $cluster "status" | default dict -}}
                 {{- range (get $status "conditions" | default list) -}}
-                  {{- if and (eq .type "Available") (eq .status "True") -}}
-                    {{- $ready = true -}}
+                  {{- if eq .type $stage.sourceCondition -}}
+                    {{- $conditionStatus = .status -}}
+                    {{- $reason = get . "reason" | default "ConditionReported" -}}
+                    {{- $message = get . "message" | default (printf "CAPI reports %s=%s" .type .status) -}}
+                    {{- if eq .status "True" -}}
+                      {{- $state = "Ready" -}}
+                    {{- else if eq .status "False" -}}
+                      {{- $state = "Reconciling" -}}
+                    {{- else -}}
+                      {{- $state = "Unknown" -}}
+                    {{- end -}}
                   {{- end -}}
                 {{- end -}}
+                {{- if get $cluster.metadata "deletionTimestamp" -}}
+                  {{- $state = "Deleting" -}}
+                  {{- $conditionStatus = "False" -}}
+                  {{- $reason = "Deleting" -}}
+                  {{- $message = "The CAPI Cluster is being deleted" -}}
+                {{- end -}}
               {{- end -}}
+              {{- if eq $stage.sourceCondition "Available" -}}
+                {{- $ready = eq $conditionStatus "True" -}}
+              {{- end -}}
+              {{- $progress = append $progress (merge (dict
+                "state" $state "status" $conditionStatus
+                "reason" $reason "message" $message) $stage) -}}
             {{- end }}
             apiVersion: cluster.x-k8s.io/v1beta2
             kind: Cluster
@@ -79,6 +111,14 @@ spec:
               annotations:
                 gotemplating.fn.crossplane.io/ready: {{ ternary "True" "False" $ready | quote }}
             status:
+              steps:
+            {{- range $stage := $progress }}
+                - name: {{ $stage.name | quote }}
+                  state: {{ $stage.state | quote }}
+                  sourceCondition: {{ $stage.sourceCondition | quote }}
+                  reason: {{ $stage.reason | quote }}
+                  message: {{ $stage.message | quote }}
+            {{- end }}
               clusterRef:
                 apiVersion: cluster.x-k8s.io/v1beta2
                 kind: Cluster
@@ -90,4 +130,15 @@ spec:
               controlPlaneEndpoint:
             {{ . | toYaml | indent 4 }}
               {{- end }}
+            {{- end }}
+            ---
+            apiVersion: meta.gotemplating.fn.crossplane.io/v1alpha1
+            kind: ClaimConditions
+            conditions:
+            {{- range $stage := $progress }}
+              - type: {{ $stage.conditionType | quote }}
+                status: {{ $stage.status | quote }}
+                reason: {{ $stage.reason | quote }}
+                message: {{ $stage.message | quote }}
+                target: Composite
             {{- end }}

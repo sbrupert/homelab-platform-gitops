@@ -81,6 +81,43 @@ spec:
             status:
               type: object
               properties:
+                steps:
+                  type: array
+                  description: >-
+                    Current CAPI observations, not sequential execution history.
+                    Each entry can return to Reconciling during recovery or rollout.
+                  x-kubernetes-list-type: map
+                  x-kubernetes-list-map-keys:
+                    - name
+                  items:
+                    type: object
+                    required:
+                      - name
+                      - state
+                      - sourceCondition
+                      - reason
+                      - message
+                    properties:
+                      name:
+                        type: string
+                        enum:
+                          - control-plane
+                          - workers
+                          - cluster-health
+                      state:
+                        type: string
+                        enum:
+                          - Pending
+                          - Reconciling
+                          - Ready
+                          - Unknown
+                          - Deleting
+                      sourceCondition:
+                        type: string
+                      reason:
+                        type: string
+                      message:
+                        type: string
                 clusterRef:
                   type: object
                   properties:
