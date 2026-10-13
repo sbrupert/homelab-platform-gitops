@@ -11,6 +11,20 @@ spec:
   # targets an undeclared named port. Match the upstream workaround until a
   # fixed CAPMOX release is available.
   patches:
+    # Upstream bundles an empty/substituted Secret with the same name as our
+    # ExternalSecret target. Keep it inert and separate so provider installation
+    # cannot overwrite ESO-managed credentials. Deployment refs stay unchanged.
+    - target:
+        version: v1
+        kind: Secret
+        name: capmox-manager-credentials
+        namespace: capmox-system
+      patch: |-
+        - op: replace
+          path: /metadata/name
+          value: capmox-provider-placeholder
+        - op: remove
+          path: /stringData
     - target:
         group: apps
         version: v1
