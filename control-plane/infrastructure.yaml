@@ -193,7 +193,9 @@ metadata:
   namespace: flux-system
 spec:
   dependsOn:
-    - name: infrastructure-capi-providers
+    # Do not wait for providers: CAPMOX's Deployment needs this Secret to start.
+    # The parallel provider stage creates capmox-system; retry until it exists.
+    - name: infrastructure-capi-operator
     - name: infrastructure-external-secrets-configs
   interval: 10m
   retryInterval: 1m
