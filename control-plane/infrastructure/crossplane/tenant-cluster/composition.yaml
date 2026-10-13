@@ -21,9 +21,6 @@ spec:
           template: |
             {{- $xr := .observed.composite.resource -}}
             {{- $spec := $xr.spec -}}
-            {{- if ne $xr.metadata.namespace "capmox-system" -}}
-            {{- fail "TenantCluster must be created in capmox-system" -}}
-            {{- end -}}
             {{- $cluster := getComposedResource . "cluster" -}}
             {{- $ready := false -}}
             {{- $progress := list -}}
@@ -90,6 +87,7 @@ spec:
               topology:
                 classRef:
                   name: kamaji-proxmox-v1
+                  namespace: capmox-system
                 version: {{ $spec.kubernetesVersion | quote }}
                 controlPlane:
                   replicas: {{ $spec.controlPlaneReplicas }}
