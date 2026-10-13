@@ -1,10 +1,9 @@
 # Reusable Kamaji hosted-control-plane / CAPMOX worker ClusterClass.
 #
 # A Cluster using this class must:
-#   - be created in the same namespace as these resources, unless classRef.namespace
-#     is set explicitly;
-#   - set platform.sbrtech.xyz/networking=managed-cilium so the shared
-#     HelmChartProxy selects it; and
+#   - set classRef.namespace=capmox-system when created in a tenant namespace;
+#   - set platform.sbrtech.xyz/networking=managed-cilium and have the Cilium
+#     HelmChartProxy available in the Cluster's namespace; and
 #   - provide managementIPv4Config with addresses reserved for that cluster by
 #     the platform IPAM orchestrator.
 #
@@ -25,8 +24,9 @@ spec:
       # Kamaji hosts the control plane in the management cluster; CAPMOX only
       # provisions tenant worker VMs.
       externalManagedControlPlane: true
-      credentialsRef:
-        name: capmox-manager-credentials
+      # Omit credentialsRef: CAPMOX uses the controller-wide client configured
+      # from capmox-system/capmox-manager-credentials. Tenant namespaces never
+      # receive Proxmox credentials and clusters do not own the shared Secret.
       # ProxmoxClusterTemplate admission requires a valid IP configuration.
       # The ClusterClass requires managementIPv4Config and replaces this
       # documentation-only TEST-NET configuration before a ProxmoxCluster is
