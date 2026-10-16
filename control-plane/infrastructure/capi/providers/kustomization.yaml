@@ -7,4 +7,3 @@ resources:
   - control-plane.yaml
   - infrastructure.yaml
   - ipam.yaml
-  - addon.yaml

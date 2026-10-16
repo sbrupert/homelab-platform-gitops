@@ -1,0 +1,38 @@
+# Cluster-scoped: one profile selects CAPI Clusters across tenant namespaces.
+# Flux owns this profile; Sveltos owns the workload Helm releases.
+apiVersion: config.projectsveltos.io/v1beta1
+kind: ClusterProfile
+metadata:
+  name: platform-cilium
+spec:
+  clusterSelector:
+    matchLabels:
+      platform.sbrtech.xyz/networking: managed-cilium
+  syncMode: Continuous
+  helmCharts:
+    - repositoryURL: oci://quay.io/cilium/charts
+      repositoryName: cilium
+      chartName: cilium
+      chartVersion: "1.20.2"
+      releaseName: platform-cilium
+      releaseNamespace: kube-system
+      helmChartAction: Install
+      options:
+        wait: false
+        timeout: 10m
+        installOptions:
+          createNamespace: false
+      values: |
+        ipam:
+          mode: kubernetes
+        kubeProxyReplacement: true
+        k8sServiceHost: "{{ .Cluster.spec.controlPlaneEndpoint.host }}"
+        k8sServicePort: 6443
+        operator:
+          replicas: 1
+        hubble:
+          enabled: false
+        gatewayAPI:
+          enabled: true
+        bgpControlPlane:
+          enabled: true

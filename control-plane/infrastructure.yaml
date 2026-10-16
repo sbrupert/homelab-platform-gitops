@@ -96,10 +96,6 @@ spec:
       kind: IPAMProvider
       name: in-cluster
       namespace: capi-ipam-in-cluster-system
-    - apiVersion: operator.cluster.x-k8s.io/v1alpha2
-      kind: AddonProvider
-      name: helm
-      namespace: caaph-system
     - apiVersion: apps/v1
       kind: Deployment
       name: capi-controller-manager
@@ -124,10 +120,6 @@ spec:
       kind: Deployment
       name: capi-ipam-in-cluster-controller-manager
       namespace: capi-ipam-in-cluster-system
-    - apiVersion: apps/v1
-      kind: Deployment
-      name: caaph-controller-manager
-      namespace: caaph-system
     - apiVersion: apiextensions.k8s.io/v1
       kind: CustomResourceDefinition
       name: clusterclasses.cluster.x-k8s.io
@@ -143,9 +135,6 @@ spec:
     - apiVersion: apiextensions.k8s.io/v1
       kind: CustomResourceDefinition
       name: kubeadmconfigtemplates.bootstrap.cluster.x-k8s.io
-    - apiVersion: apiextensions.k8s.io/v1
-      kind: CustomResourceDefinition
-      name: helmchartproxies.addons.cluster.x-k8s.io
   healthCheckExprs:
     - apiVersion: operator.cluster.x-k8s.io/v1alpha2
       current: >-
@@ -183,7 +172,7 @@ spec:
         status.conditions.exists(c, c.type == 'Established' && c.status == 'True') &&
         status.conditions.exists(c, c.type == 'NamesAccepted' && c.status == 'True') &&
         spec.versions.exists(v,
-          v.name == {"clusterclasses.cluster.x-k8s.io":"v1beta2","proxmoxclustertemplates.infrastructure.cluster.x-k8s.io":"v1alpha2","proxmoxmachinetemplates.infrastructure.cluster.x-k8s.io":"v1alpha2","kamajicontrolplanetemplates.controlplane.cluster.x-k8s.io":"v1alpha2","kubeadmconfigtemplates.bootstrap.cluster.x-k8s.io":"v1beta2","helmchartproxies.addons.cluster.x-k8s.io":"v1alpha1"}[metadata.name] && v.served
+          v.name == {"clusterclasses.cluster.x-k8s.io":"v1beta2","proxmoxclustertemplates.infrastructure.cluster.x-k8s.io":"v1alpha2","proxmoxmachinetemplates.infrastructure.cluster.x-k8s.io":"v1alpha2","kamajicontrolplanetemplates.controlplane.cluster.x-k8s.io":"v1alpha2","kubeadmconfigtemplates.bootstrap.cluster.x-k8s.io":"v1beta2"}[metadata.name] && v.served
         )
 ---
 apiVersion: kustomize.toolkit.fluxcd.io/v1
@@ -235,18 +224,57 @@ spec:
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
-  name: infrastructure-capi-addon-profiles
+  name: infrastructure-sveltos
   namespace: flux-system
 spec:
   dependsOn:
     - name: infrastructure-capi-providers
-    - name: infrastructure-capi-classes
   interval: 10m
   retryInterval: 1m
   timeout: 10m
-  path: ./control-plane/infrastructure/capi/addon-profiles
+  path: ./control-plane/infrastructure/controllers/sveltos
   prune: true
-  wait: true
+  # Explicit checks include CRDs installed indirectly by the Helm chart.
+  wait: false
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  healthChecks:
+    - apiVersion: helm.toolkit.fluxcd.io/v2
+      kind: HelmRelease
+      name: projectsveltos
+      namespace: projectsveltos
+    - apiVersion: apiextensions.k8s.io/v1
+      kind: CustomResourceDefinition
+      name: clusterprofiles.config.projectsveltos.io
+    - apiVersion: apiextensions.k8s.io/v1
+      kind: CustomResourceDefinition
+      name: clustersummaries.config.projectsveltos.io
+  healthCheckExprs:
+    - apiVersion: apiextensions.k8s.io/v1
+      kind: CustomResourceDefinition
+      current: >-
+        !has(metadata.deletionTimestamp) &&
+        has(status.conditions) &&
+        status.conditions.exists(c, c.type == 'Established' && c.status == 'True') &&
+        status.conditions.exists(c, c.type == 'NamesAccepted' && c.status == 'True') &&
+        spec.versions.exists(v, v.name == 'v1beta1' && v.served)
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: infrastructure-sveltos-configs
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: infrastructure-sveltos
+  interval: 10m
+  retryInterval: 1m
+  timeout: 5m
+  path: ./control-plane/infrastructure/configs/sveltos
+  prune: true
+  # Apply the profile; do not gate API bootstrap on tenant Cilium readiness.
+  wait: false
   sourceRef:
     kind: GitRepository
     name: flux-system

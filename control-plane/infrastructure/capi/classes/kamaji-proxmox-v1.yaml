@@ -2,8 +2,8 @@
 #
 # A Cluster using this class must:
 #   - set classRef.namespace=capmox-system when created in a tenant namespace;
-#   - set platform.sbrtech.xyz/networking=managed-cilium and have the Cilium
-#     HelmChartProxy available in the Cluster's namespace; and
+#   - set platform.sbrtech.xyz/networking=managed-cilium so the shared Sveltos
+#     ClusterProfile selects it across namespaces; and
 #   - provide managementIPv4Config with addresses reserved for that cluster by
 #     the platform IPAM orchestrator.
 #

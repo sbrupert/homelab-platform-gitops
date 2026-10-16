@@ -53,7 +53,7 @@ spec:
   dependsOn:
     - name: infrastructure-crossplane-functions
     - name: infrastructure-capi-classes
-    - name: infrastructure-capi-addon-profiles
+    - name: infrastructure-sveltos-configs
   interval: 10m
   retryInterval: 1m
   timeout: 10m
