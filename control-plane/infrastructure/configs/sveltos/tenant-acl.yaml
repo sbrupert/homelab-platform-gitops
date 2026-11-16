@@ -258,7 +258,7 @@ data:
                   "apiGroups": dyn([""]),
                   "resources": dyn(["namespaces"]),
                   "resourceNames": dyn([variables.ns]),
-                  "verbs": dyn(["get", "patch", "update", "delete", "watch"]
+                  "verbs": dyn(["get", "patch", "update", "delete", "watch"])
                 }])
               },
               {
