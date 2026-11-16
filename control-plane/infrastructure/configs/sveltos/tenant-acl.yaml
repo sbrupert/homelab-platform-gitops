@@ -1,0 +1,327 @@
+# This ConfigMap stays in the management cluster. Sveltos renders its YAML data
+# into each selected tenant cluster; the ConfigMap itself is not deployed there.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: platform-tenant-acl
+  namespace: projectsveltos
+data:
+  tenant-acl.yaml: |
+    ---
+    # No identity receives this group until OIDC is configured. The grants are
+    # therefore inert until the platform deliberately maps a tenant to it.
+    apiVersion: rbac.authorization.k8s.io/v1
+    kind: ClusterRole
+    metadata:
+      name: platform-tenant-namespace-create
+    rules:
+      - apiGroups: [""]
+        resources: [namespaces]
+        verbs: [create]
+    ---
+    apiVersion: rbac.authorization.k8s.io/v1
+    kind: ClusterRoleBinding
+    metadata:
+      name: platform-tenant-namespace-create
+    roleRef:
+      apiGroup: rbac.authorization.k8s.io
+      kind: ClusterRole
+      name: platform-tenant-namespace-create
+    subjects:
+      - kind: Group
+        apiGroup: rbac.authorization.k8s.io
+        name: platform:tenant-admins
+    ---
+    # Bound only inside qualifying tenant namespaces by the generator below.
+    # It intentionally excludes RBAC and all cluster-scoped resources.
+    apiVersion: rbac.authorization.k8s.io/v1
+    kind: ClusterRole
+    metadata:
+      name: platform-tenant-admin
+    rules:
+      - apiGroups: [""]
+        resources: [pods, services, configmaps, secrets, persistentvolumeclaims, serviceaccounts]
+        verbs: [get, list, watch, create, update, patch, delete]
+      - apiGroups: [""]
+        resources: [events, pods/log]
+        verbs: [get, list, watch]
+      - apiGroups: [""]
+        resources: [pods/exec, pods/attach, pods/portforward]
+        verbs: [get, create]
+      - apiGroups: [events.k8s.io]
+        resources: [events]
+        verbs: [get, list, watch]
+      - apiGroups: [apps]
+        resources: [deployments, statefulsets, daemonsets, replicasets]
+        verbs: [get, list, watch, create, update, patch, delete]
+      - apiGroups: [apps]
+        resources: [deployments/scale, statefulsets/scale, replicasets/scale]
+        verbs: [get, update, patch]
+      - apiGroups: [batch]
+        resources: [jobs, cronjobs]
+        verbs: [get, list, watch, create, update, patch, delete]
+      - apiGroups: [autoscaling]
+        resources: [horizontalpodautoscalers]
+        verbs: [get, list, watch, create, update, patch, delete]
+      - apiGroups: [policy]
+        resources: [poddisruptionbudgets]
+        verbs: [get, list, watch, create, update, patch, delete]
+      - apiGroups: [networking.k8s.io]
+        resources: [ingresses, networkpolicies]
+        verbs: [get, list, watch, create, update, patch, delete]
+    ---
+    # Kyverno's trusted background controller receives only the authority
+    # required to create application namespace bindings.
+    apiVersion: rbac.authorization.k8s.io/v1
+    kind: ClusterRole
+    metadata:
+      name: platform-kyverno-tenant-access
+      labels:
+        rbac.kyverno.io/aggregate-to-background-controller: "true"
+    rules:
+      - apiGroups: [""]
+        resources: [namespaces]
+        verbs: [get, list, watch]
+      - apiGroups: [rbac.authorization.k8s.io]
+        resources: [rolebindings]
+        verbs: [get, list, watch, create, update, patch, delete]
+      - apiGroups: [rbac.authorization.k8s.io]
+        resources: [clusterroles]
+        resourceNames: [platform-tenant-admin]
+        verbs: [get, bind]
+    ---
+    # Namespace lifecycle requires dynamically named ClusterRoles and bindings.
+    # This broad controller authority is trusted platform code, never tenant RBAC.
+    apiVersion: rbac.authorization.k8s.io/v1
+    kind: ClusterRole
+    metadata:
+      name: platform-kyverno-namespace-access
+      labels:
+        rbac.kyverno.io/aggregate-to-background-controller: "true"
+    rules:
+      - apiGroups: [""]
+        resources: [namespaces]
+        verbs: [get, list, watch, patch, update, delete]
+      - apiGroups: [rbac.authorization.k8s.io]
+        resources: [clusterroles, clusterrolebindings]
+        verbs: [get, list, watch, create, update, patch, delete]
+    ---
+    # Enforces reserved names, the tenant audience marker, and Restricted PSA
+    # labels whenever a tenant-admin creates, changes, or deletes a Namespace.
+    apiVersion: policies.kyverno.io/v1
+    kind: ValidatingPolicy
+    metadata:
+      name: platform-tenant-namespace-boundary
+    spec:
+      failurePolicy: Fail
+      validationActions: [Deny]
+      evaluation:
+        background:
+          enabled: false
+      matchConstraints:
+        resourceRules:
+          - apiGroups: [""]
+            apiVersions: ["v1"]
+            operations: ["CREATE", "UPDATE", "DELETE"]
+            resources: ["namespaces"]
+      matchConditions:
+        - name: tenant-admin-identity
+          expression: "'platform:tenant-admins' in request.userInfo.?groups.orValue([])"
+      variables:
+        - name: namespaceName
+          expression: "request.operation == 'DELETE' ? oldObject.metadata.name : object.metadata.name"
+        - name: requiredLabels
+          expression: >-
+            {
+              'platform.sbrtech.xyz/audience': 'tenant',
+              'pod-security.kubernetes.io/enforce': 'restricted',
+              'pod-security.kubernetes.io/enforce-version': 'v1.36',
+              'pod-security.kubernetes.io/audit': 'restricted',
+              'pod-security.kubernetes.io/audit-version': 'v1.36',
+              'pod-security.kubernetes.io/warn': 'restricted',
+              'pod-security.kubernetes.io/warn-version': 'v1.36'
+            }
+      validations:
+        - expression: >-
+            !(variables.namespaceName == 'default' ||
+              variables.namespaceName.startsWith('platform-') ||
+              variables.namespaceName.startsWith('kube-') ||
+              variables.namespaceName.endsWith('-system'))
+          message: "Tenant users cannot create, update, or delete reserved namespaces."
+        - expression: >-
+            request.operation == 'DELETE' ||
+            variables.requiredLabels.all(key, object.metadata.?labels[key].orValue('') == variables.requiredLabels[key])
+          message: "Tenant namespaces require audience=tenant and Restricted Pod Security labels pinned to v1.36."
+        - expression: >-
+            request.operation == 'CREATE' ||
+            oldObject.metadata.?labels['platform.sbrtech.xyz/audience'].orValue('') == 'tenant'
+          message: "Tenants cannot claim, modify, or delete a namespace outside the tenant audience."
+    ---
+    # Grants the tenant group its application role only inside an explicitly
+    # eligible namespace. Existing qualifying namespaces are reconciled too.
+    apiVersion: policies.kyverno.io/v1
+    kind: GeneratingPolicy
+    metadata:
+      name: platform-tenant-application-access
+    spec:
+      evaluation:
+        generateExisting:
+          enabled: true
+        synchronize:
+          enabled: true
+        orphanDownstreamOnPolicyDelete:
+          enabled: false
+      matchConstraints:
+        resourceRules:
+          - apiGroups: [""]
+            apiVersions: ["v1"]
+            operations: ["CREATE", "UPDATE"]
+            resources: ["namespaces"]
+      matchConditions:
+        - name: tenant-application-namespace
+          expression: >-
+            object.metadata.?labels['platform.sbrtech.xyz/audience'].orValue('') == 'tenant' &&
+            !(object.metadata.name == 'default' || object.metadata.name.startsWith('platform-') ||
+              object.metadata.name.startsWith('kube-') || object.metadata.name.endsWith('-system'))
+      variables:
+        - name: ns
+          expression: object.metadata.name
+      generate:
+        - expression: |-
+            generator.Apply(variables.ns, [
+              {
+                "apiVersion": dyn("rbac.authorization.k8s.io/v1"),
+                "kind": dyn("RoleBinding"),
+                "metadata": dyn({
+                  "name": dyn("platform-tenant-admin"),
+                  "labels": dyn({
+                    "platform.sbrtech.xyz/access-policy": dyn("platform-tenant-application-access")
+                  })
+                }),
+                "roleRef": dyn({
+                  "apiGroup": dyn("rbac.authorization.k8s.io"),
+                  "kind": dyn("ClusterRole"),
+                  "name": dyn("platform-tenant-admin")
+                }),
+                "subjects": dyn([{
+                  "kind": dyn("Group"),
+                  "apiGroup": dyn("rbac.authorization.k8s.io"),
+                  "name": dyn("platform:tenant-admins")
+                }])
+              }
+            ])
+    ---
+    # Generates exact-name Namespace-object authority separately from workload
+    # authority, including reconciliation for existing qualifying namespaces.
+    apiVersion: policies.kyverno.io/v1
+    kind: GeneratingPolicy
+    metadata:
+      name: platform-tenant-namespace-access
+    spec:
+      evaluation:
+        generateExisting:
+          enabled: true
+        synchronize:
+          enabled: true
+        orphanDownstreamOnPolicyDelete:
+          enabled: false
+      matchConstraints:
+        resourceRules:
+          - apiGroups: [""]
+            apiVersions: ["v1"]
+            operations: ["CREATE", "UPDATE"]
+            resources: ["namespaces"]
+      matchConditions:
+        - name: tenant-application-namespace
+          expression: >-
+            object.metadata.?labels['platform.sbrtech.xyz/audience'].orValue('') == 'tenant' &&
+            !(object.metadata.name == 'default' || object.metadata.name.startsWith('platform-') ||
+              object.metadata.name.startsWith('kube-') || object.metadata.name.endsWith('-system'))
+      variables:
+        - name: ns
+          expression: object.metadata.name
+        - name: roleName
+          expression: "'platform-namespace-' + variables.ns"
+      generate:
+        - expression: |-
+            generator.Apply("", [
+              {
+                "apiVersion": dyn("rbac.authorization.k8s.io/v1"),
+                "kind": dyn("ClusterRole"),
+                "metadata": dyn({
+                  "name": dyn(variables.roleName),
+                  "labels": dyn({
+                    "platform.sbrtech.xyz/access-policy": dyn("platform-tenant-namespace-access")
+                  })
+                }),
+                "rules": dyn([{
+                  "apiGroups": dyn([""]),
+                  "resources": dyn(["namespaces"]),
+                  "resourceNames": dyn([variables.ns]),
+                  "verbs": dyn(["get", "patch", "update", "delete", "watch"]
+                }])
+              },
+              {
+                "apiVersion": dyn("rbac.authorization.k8s.io/v1"),
+                "kind": dyn("ClusterRoleBinding"),
+                "metadata": dyn({
+                  "name": dyn(variables.roleName),
+                  "labels": dyn({
+                    "platform.sbrtech.xyz/access-policy": dyn("platform-tenant-namespace-access")
+                  })
+                }),
+                "roleRef": dyn({
+                  "apiGroup": dyn("rbac.authorization.k8s.io"),
+                  "kind": dyn("ClusterRole"),
+                  "name": dyn(variables.roleName)
+                }),
+                "subjects": dyn([{
+                  "kind": dyn("Group"),
+                  "apiGroup": dyn("rbac.authorization.k8s.io"),
+                  "name": dyn("platform:tenant-admins")
+                }])
+              }
+            ])
+    ---
+    # The generated binding is platform-owned even if a later policy expands
+    # the tenant role to include RoleBinding write access.
+    apiVersion: policies.kyverno.io/v1
+    kind: ValidatingPolicy
+    metadata:
+      name: platform-tenant-generated-access-protection
+    spec:
+      failurePolicy: Fail
+      validationActions: [Deny]
+      evaluation:
+        background:
+          enabled: false
+      matchConstraints:
+        resourceRules:
+          - apiGroups: ["rbac.authorization.k8s.io"]
+            apiVersions: ["v1"]
+            operations: ["CREATE", "UPDATE", "DELETE"]
+            resources: ["rolebindings"]
+      matchConditions:
+        - name: tenant-admin-identity
+          expression: "'platform:tenant-admins' in request.userInfo.?groups.orValue([])"
+      validations:
+        - expression: >-
+            (request.operation == 'DELETE' ? oldObject.metadata.name : object.metadata.name) != 'platform-tenant-admin'
+          message: "The platform-tenant-admin binding is platform-managed."
+---
+apiVersion: config.projectsveltos.io/v1beta1
+kind: ClusterProfile
+metadata:
+  name: platform-tenant-acl
+spec:
+  clusterSelector:
+    matchLabels:
+      platform.sbrtech.xyz/networking: managed-cilium
+  dependsOn:
+    - platform-kyverno
+  syncMode: Continuous
+  policyRefs:
+    - kind: ConfigMap
+      namespace: projectsveltos
+      name: platform-tenant-acl
+      deploymentType: Remote

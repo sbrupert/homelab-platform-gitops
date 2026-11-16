@@ -1,0 +1,38 @@
+# Cluster-scoped: Kyverno is a required security baseline for every platform
+# TenantCluster. The CAPI composition applies this selector label to all of them.
+apiVersion: config.projectsveltos.io/v1beta1
+kind: ClusterProfile
+metadata:
+  name: platform-kyverno
+spec:
+  clusterSelector:
+    matchLabels:
+      platform.sbrtech.xyz/networking: managed-cilium
+  # Cilium establishes workload networking before Kyverno Pods and webhook
+  # Services are expected to become Ready.
+  dependsOn:
+    - platform-cilium
+  syncMode: Continuous
+  helmCharts:
+    - repositoryURL: https://kyverno.github.io/kyverno/
+      repositoryName: kyverno
+      chartName: kyverno
+      chartVersion: "3.10.0"
+      releaseName: kyverno
+      releaseNamespace: kyverno-system
+      helmChartAction: Install
+      options:
+        # The ACL profile must not begin until the Helm release reports Ready.
+        wait: true
+        timeout: 10m
+        installOptions:
+          createNamespace: true
+      values: |
+        admissionController:
+          # Three replicas and a PDB provide admission availability when a
+          # tenant has multiple workers. A one-worker tenant cluster cannot be
+          # made highly available by this setting alone.
+          replicas: 3
+          podDisruptionBudget:
+            enabled: true
+            minAvailable: 2
