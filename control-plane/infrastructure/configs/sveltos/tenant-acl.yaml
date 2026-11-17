@@ -308,6 +308,93 @@ data:
         - expression: >-
             (request.operation == 'DELETE' ? oldObject.metadata.name : object.metadata.name) != 'platform-tenant-admin'
           message: "The platform-tenant-admin binding is platform-managed."
+    ---
+    # Tenant application Services cannot allocate a node port or consume a
+    # platform LoadBalancer address. ClusterIP and ExternalName remain allowed.
+    apiVersion: policies.kyverno.io/v1
+    kind: ValidatingPolicy
+    metadata:
+      name: platform-tenant-service-exposure
+    spec:
+      failurePolicy: Fail
+      validationActions: [Deny]
+      evaluation:
+        background:
+          enabled: false
+      matchConstraints:
+        namespaceSelector:
+          matchLabels:
+            platform.sbrtech.xyz/audience: tenant
+        resourceRules:
+          - apiGroups: [""]
+            apiVersions: ["v1"]
+            operations: ["CREATE", "UPDATE"]
+            resources: ["services"]
+      validations:
+        - expression: >-
+            object.spec.?type.orValue('ClusterIP') != 'NodePort' &&
+            object.spec.?type.orValue('ClusterIP') != 'LoadBalancer'
+          message: "Tenant Services must not use NodePort or LoadBalancer; use the platform routing interface instead."
+    ---
+    # Storage classes are a platform catalog. Tenant PVCs may use only the
+    # certified classes listed here; an omitted or empty class is rejected.
+    apiVersion: policies.kyverno.io/v1
+    kind: ValidatingPolicy
+    metadata:
+      name: platform-tenant-storage-class
+    spec:
+      failurePolicy: Fail
+      validationActions: [Deny]
+      evaluation:
+        background:
+          enabled: false
+      matchConstraints:
+        namespaceSelector:
+          matchLabels:
+            platform.sbrtech.xyz/audience: tenant
+        resourceRules:
+          - apiGroups: [""]
+            apiVersions: ["v1"]
+            operations: ["CREATE", "UPDATE"]
+            resources: ["persistentvolumeclaims"]
+      validations:
+        - expression: >-
+            object.spec.?storageClassName.orValue('') in
+            ['fast-file', 'fast-block', 'bulk-file', 'bulk-block']
+          message: "Tenant PVCs must specify one of: fast-file, fast-block, bulk-file, bulk-block."
+    ---
+    # Every regular and init container in a tenant Pod must reserve CPU and
+    # memory. Limits remain optional platform policy.
+    apiVersion: policies.kyverno.io/v1
+    kind: ValidatingPolicy
+    metadata:
+      name: platform-tenant-pod-resource-requests
+    spec:
+      failurePolicy: Fail
+      validationActions: [Deny]
+      evaluation:
+        background:
+          enabled: false
+      matchConstraints:
+        namespaceSelector:
+          matchLabels:
+            platform.sbrtech.xyz/audience: tenant
+        resourceRules:
+          - apiGroups: [""]
+            apiVersions: ["v1"]
+            operations: ["CREATE"]
+            resources: ["pods"]
+      validations:
+        - expression: >-
+            object.spec.containers.all(container,
+              has(container.resources) && has(container.resources.requests) &&
+              has(container.resources.requests.cpu) && has(container.resources.requests.memory))
+          message: "Every tenant Pod container must specify CPU and memory requests."
+        - expression: >-
+            !has(object.spec.initContainers) || object.spec.initContainers.all(container,
+              has(container.resources) && has(container.resources.requests) &&
+              has(container.resources.requests.cpu) && has(container.resources.requests.memory))
+          message: "Every tenant Pod init container must specify CPU and memory requests."
 ---
 apiVersion: config.projectsveltos.io/v1beta1
 kind: ClusterProfile
